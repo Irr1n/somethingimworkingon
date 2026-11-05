@@ -900,6 +900,108 @@ return function(Library, VisualsTab)
     end
 
     -- ============================================
+    -- 9.5 MAP MODIFIERS (новое)
+    -- ============================================
+    local MapModifiers = {
+        MaterialEnabled = false,
+        ColorEnabled = false,
+        ColorValue = Color3.fromRGB(255, 255, 255),
+        TransparencyEnabled = false,
+        TransparencyValue = 0,
+        Originals = setmetatable({}, { __mode = "k" }),
+        PartConnections = {},
+        GlobalConnection = nil,
+        PendingApply = false,
+    }
+
+    local function mapGetContainer()
+        local map = Workspace:FindFirstChild("Map")
+        local parts = map and map:FindFirstChild("Parts")
+        return parts and parts:FindFirstChild("M_Pars")
+    end
+
+    local function mapAnyEnabled()
+        return MapModifiers.MaterialEnabled
+            or MapModifiers.ColorEnabled
+            or MapModifiers.TransparencyEnabled
+    end
+
+    local function mapSavePart(part)
+        if MapModifiers.Originals[part] then return end
+        MapModifiers.Originals[part] = {
+            Material = part.Material,
+            Color = part.Color,
+            Transparency = part.Transparency,
+        }
+    end
+
+    local function mapApplyPart(part)
+        if not part:IsA("BasePart") then return end
+        mapSavePart(part)
+        local orig = MapModifiers.Originals[part]
+        if not orig then return end
+
+        part.Material = MapModifiers.MaterialEnabled
+            and Enum.Material.SmoothPlastic
+            or orig.Material
+        part.Color = MapModifiers.ColorEnabled
+            and MapModifiers.ColorValue
+            or orig.Color
+        part.Transparency = MapModifiers.TransparencyEnabled
+            and math.clamp(MapModifiers.TransparencyValue, 0, 1)
+            or orig.Transparency
+    end
+
+    local function mapBindContainer(container)
+        for _, conn in ipairs(MapModifiers.PartConnections) do
+            pcall(function() conn:Disconnect() end)
+        end
+        MapModifiers.PartConnections = {}
+        if not container then return end
+
+        table.insert(MapModifiers.PartConnections, container.DescendantAdded:Connect(function(part)
+            if not mapAnyEnabled() then return end
+            if part:IsA("BasePart") then
+                task.defer(function()
+                    if part.Parent then mapApplyPart(part) end
+                end)
+            end
+        end))
+    end
+
+    local function mapApplyAll()
+        local container = mapGetContainer()
+        if not container then return end
+        for _, part in ipairs(container:GetDescendants()) do
+            if part:IsA("BasePart") then
+                mapApplyPart(part)
+            end
+        end
+    end
+
+    local function mapScheduleApply()
+        if MapModifiers.PendingApply then return end
+        MapModifiers.PendingApply = true
+        task.defer(function()
+            MapModifiers.PendingApply = false
+            mapApplyAll()
+        end)
+    end
+
+    -- Всегда слушаем пересоздание карты (например при смене раунда)
+    MapModifiers.GlobalConnection = Workspace.ChildAdded:Connect(function(child)
+        if child.Name ~= "Map" then return end
+        task.defer(function()
+            task.wait(0.3)
+            mapBindContainer(mapGetContainer())
+            if mapAnyEnabled() then mapApplyAll() end
+        end)
+    end)
+
+    -- Пробуем связаться с уже существующей картой
+    mapBindContainer(mapGetContainer())
+
+    -- ============================================
     -- ИНТЕГРАЦИЯ В ПАНЕЛИ
     -- ============================================
     local MiscPanel = VisualsTab:CreatePanel("Misc")
@@ -1130,7 +1232,7 @@ return function(Library, VisualsTab)
     })
 
     -- Custom Skybox
-    local skyboxToggle = WorldPanel:CreateToggle({
+    WorldPanel:CreateToggle({
         Text = "Custom Skybox",
         Default = false,
         Callback = function(state)
@@ -1142,7 +1244,6 @@ return function(Library, VisualsTab)
             end
         end,
     })
-    -- Прим.: первый API не поддерживает chaining у CreateToggle, поэтому skyboxToggle возвращаем через переменную если нужно.
     WorldPanel:CreateDropdown({
         Text = "Skybox",
         Options = {"Default","Nebula","Blue Nebula","Setting Hills","Blue Aurora","Red Aurora","Pink Vision","Twilight","Distopia","Peaceful"},
@@ -1286,5 +1387,52 @@ return function(Library, VisualsTab)
         Text = "Bloom Threshold",
         Min = 0, Max = 100, Default = 90.2,
         Callback = function(v) bloomT = v; if bloomEnabled then getBloom().Threshold = v end end,
+    })
+
+    -- ============================================
+    -- MAP MODIFIERS (новое — добавлено)
+    -- ============================================
+
+    WorldPanel:CreateToggle({
+        Text = "Remove Map Materials",
+        Default = false,
+        Callback = function(state)
+            MapModifiers.MaterialEnabled = state
+            mapApplyAll()
+        end,
+    })
+
+    WorldPanel:CreateToggle({
+        Text = "Change Map Color",
+        Default = false,
+        Callback = function(state)
+            MapModifiers.ColorEnabled = state
+            mapApplyAll()
+        end,
+    })
+    WorldPanel:CreateColorPicker({
+        Text = "Map Color",
+        Default = Color3.fromRGB(255, 255, 255),
+        Callback = function(c)
+            MapModifiers.ColorValue = c
+            if MapModifiers.ColorEnabled then mapScheduleApply() end
+        end,
+    })
+
+    WorldPanel:CreateToggle({
+        Text = "Map Transparency",
+        Default = false,
+        Callback = function(state)
+            MapModifiers.TransparencyEnabled = state
+            mapApplyAll()
+        end,
+    })
+    WorldPanel:CreateSlider({
+        Text = "Map Transparency Amount",
+        Min = 0, Max = 1, Default = 0, Rounding = 2,
+        Callback = function(v)
+            MapModifiers.TransparencyValue = v
+            if MapModifiers.TransparencyEnabled then mapScheduleApply() end
+        end,
     })
 end
