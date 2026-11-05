@@ -277,7 +277,7 @@ return function(Library, VisualsTab)
         task.delay(10, function() if sound and sound.Parent then sound:Destroy() end end)
     end
 
-    -- Damage Numbers — три стиля
+    -- === DAMAGE NUMBER: только 2 стиля ===
     local function showDamageNumber(player, damage)
         if not Dmg.damageEnabled then return end
         if not player or not player.Character then return end
@@ -286,7 +286,7 @@ return function(Library, VisualsTab)
 
         local style = Dmg.damageStyle or "Default"
 
-        -- ===== DEFAULT =====
+        -- ========== DEFAULT: плавно поднимается вверх и растворяется ==========
         if style == "Default" then
             local billboard = Instance.new("BillboardGui")
             billboard.Size = UDim2.new(0, 100, 0, 50)
@@ -312,7 +312,8 @@ return function(Library, VisualsTab)
             return
         end
 
-        -- ===== GROUND / SPREAD =====
+        -- ========== FLY AWAY: разлетаются в разные стороны вокруг головы ==========
+        -- Спавним на голове, летят по горизонтали в случайную сторону и растворяются
         local anchor = Instance.new("Part")
         anchor.Anchored = true
         anchor.CanCollide = false
@@ -340,31 +341,21 @@ return function(Library, VisualsTab)
         label.TextStrokeTransparency = 0.3
         label.Parent = billboard
 
-        local velocity, gravity
-        if style == "Ground" then
-            velocity = Vector3.new((math.random() * 2 - 1) * 4, 9 + math.random() * 3, (math.random() * 2 - 1) * 4)
-            gravity = Vector3.new(0, -45, 0)
-        else
-            local angle = math.random() * math.pi * 2
-            local speed = 6 + math.random() * 5
-            velocity = Vector3.new(math.cos(angle) * speed, 5 + math.random() * 5, math.sin(angle) * speed)
-            gravity = Vector3.new(0, -20, 0)
-        end
+        -- Направление: случайное по горизонтали (XZ), с небольшим подъёмом вверх
+        local angle = math.random() * math.pi * 2
+        local horizSpeed = 12 + math.random() * 8
+        local upSpeed = 3 + math.random() * 3
 
-        local startPos = anchor.Position
-        local floorY = startPos.Y - 8
-        if style == "Ground" then
-            local rayParams = RaycastParams.new()
-            rayParams.FilterType = Enum.RaycastFilterType.Exclude
-            rayParams.FilterDescendantsInstances = {player.Character, anchor}
-            local hit = Workspace:Raycast(startPos + Vector3.new(0, 1, 0), Vector3.new(0, -30, 0), rayParams)
-            if hit then floorY = hit.Position.Y + 1.2 end
-        end
+        local velocity = Vector3.new(
+            math.cos(angle) * horizSpeed,
+            upSpeed,
+            math.sin(angle) * horizSpeed
+        )
+        local gravity = Vector3.new(0, -20, 0)
 
         local elapsed = 0
-        local landed = false
-        local life = Dmg.damageLifetime + (style == "Ground" and 0.5 or 0)
-        local fadeStart = math.max(life - 0.4, 0)
+        local life = Dmg.damageLifetime
+        local fadeStart = life * 0.4
 
         local conn
         conn = RunService.Heartbeat:Connect(function(dt)
@@ -374,16 +365,8 @@ return function(Library, VisualsTab)
             end
             elapsed = elapsed + dt
 
-            if not landed then
-                velocity = velocity + gravity * dt
-                local newPos = anchor.Position + velocity * dt
-                if style == "Ground" and newPos.Y <= floorY then
-                    newPos = Vector3.new(newPos.X, floorY, newPos.Z)
-                    landed = true
-                    velocity = Vector3.zero
-                end
-                anchor.Position = newPos
-            end
+            velocity = velocity + gravity * dt
+            anchor.Position = anchor.Position + velocity * dt
 
             if elapsed >= fadeStart then
                 local t = math.clamp((elapsed - fadeStart) / math.max(life - fadeStart, 0.01), 0, 1)
@@ -1217,9 +1200,13 @@ return function(Library, VisualsTab)
     MiscPanel:CreateSlider({ Text = "Lifetime", Min = 0.5, Max = 3, Default = Dmg.damageLifetime, Callback = function(v) Dmg.damageLifetime = v end })
     MiscPanel:CreateDropdown({
         Text = "Damage Style",
-        Options = {"Default", "Ground", "Spread"},
+        Options = {"Default", "Fly Away"},
         Default = "Default",
-        Callback = function(v) Dmg.damageStyle = v end
+        Callback = function(v)
+            if v == "Fly Away" or v == "Default" then
+                Dmg.damageStyle = v
+            end
+        end
     })
 
     MiscPanel:CreateToggle({ Text = "Kill Flash", Default = false, Callback = function(s) Dmg.killFlashEnabled = s; updateMonitoringState() end })
