@@ -655,7 +655,7 @@ return function(Library, VisualsTab)
     end
 
     -- ============================================
-    -- 9. WORLD (перенесено из второго кода)
+    -- 9. WORLD
     -- ============================================
     local worldOrig = {}
     local worldConns = {}
@@ -900,7 +900,7 @@ return function(Library, VisualsTab)
     end
 
     -- ============================================
-    -- 9.5 MAP MODIFIERS (новое)
+    -- 9.5 MAP MODIFIERS (Loop Through Descendants)
     -- ============================================
     local MapModifiers = {
         MaterialEnabled = false,
@@ -926,32 +926,101 @@ return function(Library, VisualsTab)
             or MapModifiers.TransparencyEnabled
     end
 
+    -- Сохраняем оригинальные свойства парта + все связанные с ним текстуры/декали
     local function mapSavePart(part)
         if MapModifiers.Originals[part] then return end
-        MapModifiers.Originals[part] = {
+        local data = {
             Material = part.Material,
             Color = part.Color,
             Transparency = part.Transparency,
+            TextureID = part:IsA("MeshPart") and part.TextureID or nil,
+            SpecialMesh = nil,
+            SpecialMeshTextureId = nil,
+            Decorations = {},
         }
+
+        -- SpecialMesh (обычно в Part-ах, у которых текстура рисуется через дочерний Mesh)
+        local special = part:FindFirstChildOfClass("SpecialMesh")
+        if special then
+            data.SpecialMesh = special
+            data.SpecialMeshTextureId = special.TextureId
+        end
+
+        -- Decals / Textures — их нельзя удалить, только спрятать через Transparency = 1
+        for _, child in ipairs(part:GetChildren()) do
+            if child:IsA("Decal") or child:IsA("Texture") then
+                table.insert(data.Decorations, {
+                    Instance = child,
+                    Transparency = child.Transparency,
+                })
+            end
+        end
+
+        MapModifiers.Originals[part] = data
     end
 
+    -- Применяем все три модификатора к одному парту за один проход
     local function mapApplyPart(part)
-        if not part:IsA("BasePart") then return end
+        if not part:IsA("BasePart") and not part:IsA("MeshPart") then return end
         mapSavePart(part)
         local orig = MapModifiers.Originals[part]
         if not orig then return end
 
-        part.Material = MapModifiers.MaterialEnabled
-            and Enum.Material.SmoothPlastic
-            or orig.Material
-        part.Color = MapModifiers.ColorEnabled
-            and MapModifiers.ColorValue
-            or orig.Color
-        part.Transparency = MapModifiers.TransparencyEnabled
+        -- === MATERIAL + REMOVE TEXTURES ===
+        if MapModifiers.MaterialEnabled then
+            if part.Material ~= Enum.Material.SmoothPlastic then
+                part.Material = Enum.Material.SmoothPlastic
+            end
+            -- MeshPart: убираем TextureID
+            if part:IsA("MeshPart") and part.TextureID ~= "" then
+                part.TextureID = ""
+            end
+            -- SpecialMesh: убираем TextureId
+            if orig.SpecialMesh and orig.SpecialMesh.Parent and orig.SpecialMesh.TextureId ~= "" then
+                orig.SpecialMesh.TextureId = ""
+            end
+            -- Decal / Texture: полностью скрываем
+            for _, deco in ipairs(orig.Decorations) do
+                if deco.Instance.Parent and deco.Instance.Transparency ~= 1 then
+                    deco.Instance.Transparency = 1
+                end
+            end
+        else
+            -- Восстанавливаем
+            if orig.Material and part.Material ~= orig.Material then
+                part.Material = orig.Material
+            end
+            if orig.TextureID ~= nil and part:IsA("MeshPart") and part.TextureID ~= orig.TextureID then
+                part.TextureID = orig.TextureID
+            end
+            if orig.SpecialMesh and orig.SpecialMesh.Parent and orig.SpecialMeshTextureId ~= nil then
+                if orig.SpecialMesh.TextureId ~= orig.SpecialMeshTextureId then
+                    orig.SpecialMesh.TextureId = orig.SpecialMeshTextureId
+                end
+            end
+            for _, deco in ipairs(orig.Decorations) do
+                if deco.Instance.Parent and deco.Instance.Transparency ~= deco.Transparency then
+                    deco.Instance.Transparency = deco.Transparency
+                end
+            end
+        end
+
+        -- === COLOR ===
+        local targetColor = MapModifiers.ColorEnabled and MapModifiers.ColorValue or orig.Color
+        if part.Color ~= targetColor then
+            part.Color = targetColor
+        end
+
+        -- === TRANSPARENCY ===
+        local targetTransparency = MapModifiers.TransparencyEnabled
             and math.clamp(MapModifiers.TransparencyValue, 0, 1)
             or orig.Transparency
+        if part.Transparency ~= targetTransparency then
+            part.Transparency = targetTransparency
+        end
     end
 
+    -- Подписка на добавление новых партов/декораций в контейнер карты
     local function mapBindContainer(container)
         for _, conn in ipairs(MapModifiers.PartConnections) do
             pcall(function() conn:Disconnect() end)
@@ -959,22 +1028,42 @@ return function(Library, VisualsTab)
         MapModifiers.PartConnections = {}
         if not container then return end
 
-        table.insert(MapModifiers.PartConnections, container.DescendantAdded:Connect(function(part)
+        table.insert(MapModifiers.PartConnections, container.DescendantAdded:Connect(function(object)
             if not mapAnyEnabled() then return end
-            if part:IsA("BasePart") then
-                task.defer(function()
-                    if part.Parent then mapApplyPart(part) end
-                end)
-            end
+            task.defer(function()
+                if not object.Parent then return end
+                if object:IsA("BasePart") or object:IsA("MeshPart") then
+                    mapApplyPart(object)
+                else
+                    -- Добавился SpecialMesh/Decal/Texture к уже отслеживаемому парту
+                    local parent = object.Parent
+                    if parent and (parent:IsA("BasePart") or parent:IsA("MeshPart")) then
+                        local orig = MapModifiers.Originals[parent]
+                        if orig then
+                            if object:IsA("Decal") or object:IsA("Texture") then
+                                table.insert(orig.Decorations, {
+                                    Instance = object,
+                                    Transparency = object.Transparency,
+                                })
+                            elseif object:IsA("SpecialMesh") and not orig.SpecialMesh then
+                                orig.SpecialMesh = object
+                                orig.SpecialMeshTextureId = object.TextureId
+                            end
+                        end
+                        mapApplyPart(parent)
+                    end
+                end
+            end)
         end))
     end
 
+    -- Главный проход: Loop через все descendants контейнера, применяем к BasePart/MeshPart
     local function mapApplyAll()
         local container = mapGetContainer()
         if not container then return end
-        for _, part in ipairs(container:GetDescendants()) do
-            if part:IsA("BasePart") then
-                mapApplyPart(part)
+        for _, object in ipairs(container:GetDescendants()) do
+            if object:IsA("BasePart") or object:IsA("MeshPart") then
+                mapApplyPart(object)
             end
         end
     end
@@ -988,7 +1077,7 @@ return function(Library, VisualsTab)
         end)
     end
 
-    -- Всегда слушаем пересоздание карты (например при смене раунда)
+    -- Перепривязка при перезагрузке карты (смена раунда и т.п.)
     MapModifiers.GlobalConnection = Workspace.ChildAdded:Connect(function(child)
         if child.Name ~= "Map" then return end
         task.defer(function()
@@ -998,7 +1087,6 @@ return function(Library, VisualsTab)
         end)
     end)
 
-    -- Пробуем связаться с уже существующей картой
     mapBindContainer(mapGetContainer())
 
     -- ============================================
@@ -1049,7 +1137,7 @@ return function(Library, VisualsTab)
     HSPanel:CreateTextBox({ Text = "Death Sound", Default = Dmg.deathSoundId, Callback = function(t) Dmg.deathSoundId = t end })
 
     -- ============================================
-    -- WORLD PANEL (перенесено из второго кода)
+    -- WORLD PANEL
     -- ============================================
     local WorldPanel = VisualsTab:CreatePanel("World")
 
@@ -1390,7 +1478,7 @@ return function(Library, VisualsTab)
     })
 
     -- ============================================
-    -- MAP MODIFIERS (новое — добавлено)
+    -- MAP MODIFIERS (Loop Through Descendants)
     -- ============================================
 
     WorldPanel:CreateToggle({
