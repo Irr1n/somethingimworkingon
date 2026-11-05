@@ -655,6 +655,251 @@ return function(Library, VisualsTab)
     end
 
     -- ============================================
+    -- 9. WORLD (перенесено из второго кода)
+    -- ============================================
+    local worldOrig = {}
+    local worldConns = {}
+    local worldApplying = {}
+    local shadowsEnabled = false
+    local shadowsOriginal = nil
+    local ctConn = nil
+    local skyboxSpinConn = nil
+
+    local function worldSaveOrig()
+        if worldOrig.saved then return end
+        worldOrig.saved = true
+        worldOrig.ClockTime = Lighting.ClockTime
+        worldOrig.Brightness = Lighting.Brightness
+        worldOrig.GlobalShadows = Lighting.GlobalShadows
+        worldOrig.Ambient = Lighting.Ambient
+        worldOrig.OutdoorAmbient = Lighting.OutdoorAmbient
+        worldOrig.ColorShift_Top = Lighting.ColorShift_Top
+        worldOrig.ColorShift_Bottom = Lighting.ColorShift_Bottom
+        worldOrig.ExposureCompensation = Lighting.ExposureCompensation
+        pcall(function() worldOrig.Technology = Lighting.Technology end)
+    end
+
+    worldSaveOrig()
+
+    local function worldConn(key, fn)
+        if worldConns[key] then worldConns[key]:Disconnect(); worldConns[key] = nil end
+        local prop = key:match("^([^_]+)")
+        local ok, sig = pcall(Lighting.GetPropertyChangedSignal, Lighting, prop)
+        if ok and sig then
+            worldConns[key] = sig:Connect(fn)
+        end
+    end
+
+    local function worldDisconn(key)
+        if worldConns[key] then worldConns[key]:Disconnect(); worldConns[key] = nil end
+    end
+
+    local function worldSet(property, value)
+        if value == nil or worldApplying[property] then return end
+        if Lighting[property] == value then return end
+        worldApplying[property] = true
+        pcall(function() Lighting[property] = value end)
+        worldApplying[property] = nil
+    end
+
+    local fb = { Enabled = false, Active = false, PostEffects = {} }
+    local ca = { Enabled = false, Top = Color3.fromRGB(128, 128, 128), Bot = Color3.fromRGB(80, 80, 80) }
+    local cs = { Enabled = false, Top = Color3.fromRGB(255, 255, 255), Bot = Color3.fromRGB(128, 128, 128) }
+    local ce = { Enabled = false, Amount = -0.08 }
+    local ct = { Enabled = false, Time = 13 }
+    local lightTechEnabled = false
+
+    local function worldApplyAmbient()
+        local value
+        if ca.Enabled then
+            value = ca.Top
+        elseif fb.Enabled then
+            value = Color3.fromRGB(178, 178, 178)
+        else
+            value = worldOrig.Ambient
+        end
+        worldSet("Ambient", value)
+    end
+
+    local function worldApplyOutdoorAmbient()
+        worldSet("OutdoorAmbient", ca.Enabled and ca.Bot or worldOrig.OutdoorAmbient)
+    end
+
+    local function fbEnable()
+        if fb.Active then return end
+        worldSaveOrig()
+        fb.Active = true
+        fb.PostEffects = {}
+        worldSet("ClockTime", 14)
+        worldSet("Brightness", 5)
+        worldSet("GlobalShadows", false)
+        worldApplyAmbient()
+        for _, e in ipairs(Lighting:GetChildren()) do
+            if e:IsA("PostEffect") then
+                fb.PostEffects[e] = e.Enabled
+                pcall(function() e.Enabled = false end)
+            end
+        end
+        worldConn("ClockTime_fb", function() if fb.Enabled then worldSet("ClockTime", 14) end end)
+        worldConn("Brightness_fb", function() if fb.Enabled then worldSet("Brightness", 5) end end)
+        worldConn("GlobalShadows_fb", function() if fb.Enabled then worldSet("GlobalShadows", false) end end)
+        worldConn("Ambient_fb", function() if fb.Enabled then worldApplyAmbient() end end)
+    end
+
+    local function fbDisable()
+        worldDisconn("ClockTime_fb")
+        worldDisconn("Brightness_fb")
+        worldDisconn("GlobalShadows_fb")
+        worldDisconn("Ambient_fb")
+        if not fb.Active then return end
+        fb.Active = false
+        worldSet("ClockTime", worldOrig.ClockTime)
+        worldSet("Brightness", worldOrig.Brightness)
+        worldSet("GlobalShadows", shadowsEnabled and false or worldOrig.GlobalShadows)
+        worldApplyAmbient()
+        for effect, wasEnabled in pairs(fb.PostEffects) do
+            if effect and effect.Parent then
+                pcall(function() effect.Enabled = wasEnabled end)
+            end
+        end
+        fb.PostEffects = {}
+    end
+
+    local skyBoxes = {
+        ["Default"] = {
+            SkyboxLf = "rbxassetid://148943339", SkyboxBk = "rbxassetid://148943390",
+            SkyboxDn = "rbxassetid://148943362", SkyboxFt = "rbxassetid://148943404",
+            SkyboxRt = "rbxassetid://148943379", SkyboxUp = "rbxassetid://148943410",
+        },
+        ["Nebula"] = {
+            SkyboxLf = "rbxassetid://159454286", SkyboxBk = "rbxassetid://159454299",
+            SkyboxDn = "rbxassetid://159454296", SkyboxFt = "rbxassetid://159454293",
+            SkyboxRt = "rbxassetid://159454300", SkyboxUp = "rbxassetid://159454288",
+        },
+        ["Blue Nebula"] = {
+            SkyboxBk = "rbxassetid://79187608916257",  SkyboxDn = "rbxassetid://79187608916257",
+            SkyboxFt = "rbxassetid://135345543970829", SkyboxLf = "rbxassetid://130684897818024",
+            SkyboxRt = "rbxassetid://134117814265945", SkyboxUp = "rbxassetid://128019898265074",
+        },
+        ["Setting Hills"] = {
+            SkyboxLf = "rbxassetid://264909758", SkyboxBk = "rbxassetid://264908339",
+            SkyboxDn = "rbxassetid://264907909", SkyboxFt = "rbxassetid://264909420",
+            SkyboxRt = "rbxassetid://264908886", SkyboxUp = "rbxassetid://264907379",
+        },
+        ["Blue Aurora"] = {
+            SkyboxBk = "rbxassetid://12064107", SkyboxDn = "rbxassetid://12064152",
+            SkyboxFt = "rbxassetid://12064121", SkyboxLf = "rbxassetid://12063984",
+            SkyboxRt = "rbxassetid://12064115", SkyboxUp = "rbxassetid://12064131",
+        },
+        ["Red Aurora"] = {
+            SkyboxBk = "rbxassetid://401664839", SkyboxDn = "rbxassetid://401664862",
+            SkyboxFt = "rbxassetid://401664960", SkyboxLf = "rbxassetid://401664881",
+            SkyboxRt = "rbxassetid://401664901", SkyboxUp = "rbxassetid://401664936",
+        },
+        ["Pink Vision"] = {
+            SkyboxBk = "rbxassetid://6593929026", SkyboxDn = "rbxassetid://6593930140",
+            SkyboxFt = "rbxassetid://6593931249", SkyboxLf = "rbxassetid://6593932587",
+            SkyboxRt = "rbxassetid://6593933789", SkyboxUp = "rbxassetid://6593935319",
+        },
+        ["Twilight"] = {
+            SkyboxBk = "rbxassetid://570557514", SkyboxDn = "rbxassetid://570557775",
+            SkyboxFt = "rbxassetid://570557559", SkyboxLf = "rbxassetid://570557620",
+            SkyboxRt = "rbxassetid://570557672", SkyboxUp = "rbxassetid://570557727",
+        },
+        ["Distopia"] = {
+            SkyboxBk = "rbxassetid://2240134413", SkyboxDn = "rbxassetid://2240136039",
+            SkyboxFt = "rbxassetid://2240130790", SkyboxLf = "rbxassetid://2240133550",
+            SkyboxRt = "rbxassetid://2240132643", SkyboxUp = "rbxassetid://2240135222",
+        },
+        ["Peaceful"] = {
+            SkyboxBk = "rbxassetid://73252679982122",  SkyboxDn = "rbxassetid://101074061181553",
+            SkyboxFt = "rbxassetid://112572775732134", SkyboxLf = "rbxassetid://126931573973019",
+            SkyboxRt = "rbxassetid://135908172504233", SkyboxUp = "rbxassetid://124514468649717",
+        },
+    }
+
+    local currentSky = nil
+    local skyboxEnabled = false
+    local skyboxCurrent = "Peaceful"
+    local skyboxSpinEnabled = false
+    local skyboxSpinSpeed = 15
+    local skyboxSpinAngle = 0
+
+    local staleSky = Lighting:FindFirstChild("DrainCustomSkybox")
+    if staleSky and staleSky:IsA("Sky") then staleSky:Destroy() end
+
+    local function applySkybox(name)
+        local data = skyBoxes[name]
+        if not data then return end
+        if not currentSky or not currentSky.Parent then
+            currentSky = Instance.new("Sky")
+            currentSky.Name = "DrainCustomSkybox"
+            currentSky.Parent = Lighting
+        end
+        for prop, id in pairs(data) do
+            pcall(function() currentSky[prop] = id end)
+        end
+        pcall(function()
+            currentSky.SkyboxOrientation = Vector3.new(0, skyboxSpinAngle, 0)
+        end)
+    end
+
+    local function removeSkybox()
+        if currentSky then currentSky:Destroy(); currentSky = nil end
+    end
+
+    local fogEnabled = false
+    local fogDensity = 0.3
+    local fogOffset = 0
+    local fogColor = Color3.fromRGB(192, 192, 192)
+    local fogDecay = Color3.fromRGB(106, 127, 153)
+    local fogGlare = 0
+    local fogHaze = 10
+
+    local _fogAtmo = nil
+    local _fogOrigAtmo = Lighting:FindFirstChildOfClass("Atmosphere")
+
+    local function fogGetOrCreate()
+        if _fogAtmo and _fogAtmo.Parent then return _fogAtmo end
+        _fogAtmo = Instance.new("Atmosphere")
+        _fogAtmo.Name = "CustomFog"
+        _fogAtmo.Parent = Lighting
+        return _fogAtmo
+    end
+
+    local function fogApply()
+        local atmo = fogGetOrCreate()
+        atmo.Density = fogDensity
+        atmo.Offset = fogOffset
+        atmo.Color = fogColor
+        atmo.Decay = fogDecay
+        atmo.Glare = fogGlare
+        atmo.Haze = fogHaze
+    end
+
+    local function fogRemove()
+        if _fogAtmo and _fogAtmo.Parent then
+            _fogAtmo:Destroy()
+            _fogAtmo = nil
+        end
+    end
+
+    local bloomEnabled = false
+    local bloomI = 56
+    local bloomS = 4.1
+    local bloomT = 90.2
+    local _bloomObj = nil
+
+    local function getBloom()
+        if _bloomObj and _bloomObj.Parent then return _bloomObj end
+        _bloomObj = Instance.new("BloomEffect")
+        _bloomObj.Name = "CustomBloom"
+        _bloomObj.Enabled = false
+        _bloomObj.Parent = Lighting
+        return _bloomObj
+    end
+
+    -- ============================================
     -- ИНТЕГРАЦИЯ В ПАНЕЛИ
     -- ============================================
     local MiscPanel = VisualsTab:CreatePanel("Misc")
@@ -700,4 +945,346 @@ return function(Library, VisualsTab)
     HSPanel:CreateTextBox({ Text = "Hit Sound", Default = Dmg.hitSoundId, Callback = function(t) Dmg.hitSoundId = t end })
     HSPanel:CreateTextBox({ Text = "Headshot Sound", Default = Dmg.headshotSoundId, Callback = function(t) Dmg.headshotSoundId = t end })
     HSPanel:CreateTextBox({ Text = "Death Sound", Default = Dmg.deathSoundId, Callback = function(t) Dmg.deathSoundId = t end })
+
+    -- ============================================
+    -- WORLD PANEL (перенесено из второго кода)
+    -- ============================================
+    local WorldPanel = VisualsTab:CreatePanel("World")
+
+    -- Fullbright
+    WorldPanel:CreateToggle({
+        Text = "Fullbright",
+        Default = false,
+        Callback = function(state)
+            fb.Enabled = state
+            if state then fbEnable() else fbDisable() end
+        end,
+    })
+
+    -- Custom Ambience
+    WorldPanel:CreateToggle({
+        Text = "Custom Ambience",
+        Default = false,
+        Callback = function(state)
+            ca.Enabled = state
+            if state then
+                worldSaveOrig()
+                worldApplyAmbient()
+                worldApplyOutdoorAmbient()
+                worldConn("Ambient_ca", function() if ca.Enabled then worldApplyAmbient() end end)
+                worldConn("OutdoorAmbient_ca", function() if ca.Enabled then worldApplyOutdoorAmbient() end end)
+            else
+                worldDisconn("Ambient_ca")
+                worldDisconn("OutdoorAmbient_ca")
+                worldApplyAmbient()
+                worldApplyOutdoorAmbient()
+            end
+        end,
+    })
+    WorldPanel:CreateColorPicker({
+        Text = "Ambient Color",
+        Default = Color3.fromRGB(128, 128, 128),
+        Callback = function(c)
+            ca.Top = c
+            if ca.Enabled then worldApplyAmbient() end
+        end,
+    })
+    WorldPanel:CreateColorPicker({
+        Text = "Outdoor Ambient",
+        Default = Color3.fromRGB(80, 80, 80),
+        Callback = function(c)
+            ca.Bot = c
+            if ca.Enabled then worldApplyOutdoorAmbient() end
+        end,
+    })
+
+    -- Custom Colorshift
+    WorldPanel:CreateToggle({
+        Text = "Custom Colorshift",
+        Default = false,
+        Callback = function(state)
+            cs.Enabled = state
+            if state then
+                worldSaveOrig()
+                worldSet("ColorShift_Top", cs.Top)
+                worldSet("ColorShift_Bottom", cs.Bot)
+            else
+                worldSet("ColorShift_Top", worldOrig.ColorShift_Top)
+                worldSet("ColorShift_Bottom", worldOrig.ColorShift_Bottom)
+            end
+        end,
+    })
+    WorldPanel:CreateColorPicker({
+        Text = "Shift Top",
+        Default = Color3.fromRGB(255, 255, 255),
+        Callback = function(c)
+            cs.Top = c
+            if cs.Enabled then worldSet("ColorShift_Top", c) end
+        end,
+    })
+    WorldPanel:CreateColorPicker({
+        Text = "Shift Bottom",
+        Default = Color3.fromRGB(128, 128, 128),
+        Callback = function(c)
+            cs.Bot = c
+            if cs.Enabled then worldSet("ColorShift_Bottom", c) end
+        end,
+    })
+
+    -- Custom Exposure
+    WorldPanel:CreateToggle({
+        Text = "Custom Exposure",
+        Default = false,
+        Callback = function(state)
+            ce.Enabled = state
+            if state then
+                worldSaveOrig()
+                Lighting.ExposureCompensation = ce.Amount
+            else
+                if worldOrig.ExposureCompensation ~= nil then
+                    Lighting.ExposureCompensation = worldOrig.ExposureCompensation
+                end
+            end
+        end,
+    })
+    WorldPanel:CreateSlider({
+        Text = "Exposure Amount",
+        Min = -5, Max = 5, Default = -0.08,
+        Callback = function(v)
+            ce.Amount = v
+            if ce.Enabled then Lighting.ExposureCompensation = v end
+        end,
+    })
+
+    -- Custom Time
+    WorldPanel:CreateToggle({
+        Text = "Custom Time",
+        Default = false,
+        Callback = function(state)
+            ct.Enabled = state
+            if state then
+                worldSaveOrig()
+                Lighting.ClockTime = ct.Time
+                if not ctConn then
+                    ctConn = RunService.RenderStepped:Connect(function()
+                        if not ct.Enabled then return end
+                        if Lighting.ClockTime ~= ct.Time then
+                            Lighting.ClockTime = ct.Time
+                        end
+                    end)
+                end
+            else
+                if ctConn then ctConn:Disconnect(); ctConn = nil end
+                if worldOrig.ClockTime ~= nil then Lighting.ClockTime = worldOrig.ClockTime end
+            end
+        end,
+    })
+    WorldPanel:CreateSlider({
+        Text = "Time",
+        Min = 0, Max = 24, Default = 13,
+        Callback = function(v)
+            ct.Time = v
+            if ct.Enabled then Lighting.ClockTime = v end
+        end,
+    })
+
+    -- No Shadows
+    WorldPanel:CreateToggle({
+        Text = "No Shadows",
+        Default = false,
+        Callback = function(state)
+            if state then
+                if not shadowsEnabled then shadowsOriginal = worldOrig.GlobalShadows end
+                shadowsEnabled = true
+                Lighting.GlobalShadows = false
+            else
+                if shadowsEnabled and shadowsOriginal ~= nil then
+                    Lighting.GlobalShadows = fb.Enabled and false or shadowsOriginal
+                end
+                shadowsEnabled = false
+                shadowsOriginal = nil
+            end
+        end,
+    })
+
+    -- Custom Light Tech
+    WorldPanel:CreateToggle({
+        Text = "Custom Light Tech",
+        Default = false,
+        Callback = function(state)
+            lightTechEnabled = state
+            if not state and worldOrig.Technology then
+                pcall(function() Lighting.Technology = worldOrig.Technology end)
+            end
+        end,
+    })
+    WorldPanel:CreateDropdown({
+        Text = "Lighting Technology",
+        Options = {"Compatibility", "ShadowMap", "Future", "Voxel"},
+        Default = "Future",
+        Callback = function(v)
+            if lightTechEnabled then
+                pcall(function() Lighting.Technology = Enum.Technology[v] end)
+            end
+        end,
+    })
+
+    -- Custom Skybox
+    local skyboxToggle = WorldPanel:CreateToggle({
+        Text = "Custom Skybox",
+        Default = false,
+        Callback = function(state)
+            skyboxEnabled = state
+            if state then
+                applySkybox(skyboxCurrent)
+            else
+                removeSkybox()
+            end
+        end,
+    })
+    -- Прим.: первый API не поддерживает chaining у CreateToggle, поэтому skyboxToggle возвращаем через переменную если нужно.
+    WorldPanel:CreateDropdown({
+        Text = "Skybox",
+        Options = {"Default","Nebula","Blue Nebula","Setting Hills","Blue Aurora","Red Aurora","Pink Vision","Twilight","Distopia","Peaceful"},
+        Default = "Peaceful",
+        Callback = function(v)
+            skyboxCurrent = v
+            if skyboxEnabled then applySkybox(v) end
+        end,
+    })
+    WorldPanel:CreateToggle({
+        Text = "Skybox Spin",
+        Default = false,
+        Callback = function(state)
+            skyboxSpinEnabled = state
+            if state then
+                if not skyboxEnabled then
+                    skyboxEnabled = true
+                    applySkybox(skyboxCurrent)
+                end
+                if not skyboxSpinConn then
+                    skyboxSpinConn = RunService.RenderStepped:Connect(function(delta)
+                        if not skyboxSpinEnabled or not currentSky or not currentSky.Parent then return end
+                        skyboxSpinAngle = (skyboxSpinAngle + delta * skyboxSpinSpeed) % 360
+                        pcall(function()
+                            currentSky.SkyboxOrientation = Vector3.new(0, skyboxSpinAngle, 0)
+                        end)
+                    end)
+                end
+            else
+                if skyboxSpinConn then skyboxSpinConn:Disconnect(); skyboxSpinConn = nil end
+                skyboxSpinAngle = 0
+                if currentSky and currentSky.Parent then
+                    pcall(function() currentSky.SkyboxOrientation = Vector3.zero end)
+                end
+            end
+        end,
+    })
+    WorldPanel:CreateSlider({
+        Text = "Spin Speed",
+        Min = 1, Max = 180, Default = 15,
+        Callback = function(value) skyboxSpinSpeed = value end,
+    })
+
+    -- Fog
+    WorldPanel:CreateToggle({
+        Text = "Fog",
+        Default = false,
+        Callback = function(state)
+            fogEnabled = state
+            if state then
+                if _fogOrigAtmo and _fogOrigAtmo.Parent then
+                    pcall(function() _fogOrigAtmo.Parent = nil end)
+                end
+                fogApply()
+            else
+                fogRemove()
+                if _fogOrigAtmo then
+                    pcall(function() _fogOrigAtmo.Parent = Lighting end)
+                end
+            end
+        end,
+    })
+    WorldPanel:CreateColorPicker({
+        Text = "Fog Color",
+        Default = Color3.fromRGB(192, 192, 192),
+        Callback = function(c)
+            fogColor = c
+            if fogEnabled then fogApply() end
+        end,
+    })
+    WorldPanel:CreateColorPicker({
+        Text = "Fog Decay",
+        Default = Color3.fromRGB(106, 127, 153),
+        Callback = function(c)
+            fogDecay = c
+            if fogEnabled then fogApply() end
+        end,
+    })
+    WorldPanel:CreateSlider({
+        Text = "Fog Density",
+        Min = 0, Max = 1, Default = 0.3,
+        Callback = function(v)
+            fogDensity = v
+            if fogEnabled then fogApply() end
+        end,
+    })
+    WorldPanel:CreateSlider({
+        Text = "Fog Offset",
+        Min = 0, Max = 1, Default = 0,
+        Callback = function(v)
+            fogOffset = v
+            if fogEnabled then fogApply() end
+        end,
+    })
+    WorldPanel:CreateSlider({
+        Text = "Fog Haze",
+        Min = 0, Max = 10, Default = 10,
+        Callback = function(v)
+            fogHaze = v
+            if fogEnabled then fogApply() end
+        end,
+    })
+    WorldPanel:CreateSlider({
+        Text = "Fog Glare",
+        Min = 0, Max = 10, Default = 0,
+        Callback = function(v)
+            fogGlare = v
+            if fogEnabled then fogApply() end
+        end,
+    })
+
+    -- Bloom
+    WorldPanel:CreateToggle({
+        Text = "Bloom",
+        Default = false,
+        Callback = function(state)
+            bloomEnabled = state
+            if state then
+                local b = getBloom()
+                b.Enabled = true
+                b.Intensity = bloomI
+                b.Size = bloomS
+                b.Threshold = bloomT
+            elseif _bloomObj then
+                _bloomObj:Destroy()
+                _bloomObj = nil
+            end
+        end,
+    })
+    WorldPanel:CreateSlider({
+        Text = "Bloom Intensity",
+        Min = 0, Max = 100, Default = 56,
+        Callback = function(v) bloomI = v; if bloomEnabled then getBloom().Intensity = v end end,
+    })
+    WorldPanel:CreateSlider({
+        Text = "Bloom Size",
+        Min = 0, Max = 56, Default = 4.1,
+        Callback = function(v) bloomS = v; if bloomEnabled then getBloom().Size = v end end,
+    })
+    WorldPanel:CreateSlider({
+        Text = "Bloom Threshold",
+        Min = 0, Max = 100, Default = 90.2,
+        Callback = function(v) bloomT = v; if bloomEnabled then getBloom().Threshold = v end end,
+    })
 end
