@@ -13,6 +13,163 @@ return function(Library, VisualsTab)
     local Camera = workspace.CurrentCamera
 
     -- ============================================
+    -- 0. HIT SOUNDS PRESETS
+    -- ============================================
+    local rageHitSounds = {
+        Rust = "rbxassetid://5043539486",
+        CODE200 = "rbxassetid://98545664405431",
+        Minecraft = "rbxassetid://7151570575",
+        Neverlose = "rbxassetid://6607204501",
+        Gamesense = "rbxassetid://5633695679",
+        Bonk = "rbxassetid://3765689841",
+        Bat = "rbxassetid://3333907347",
+        ["Laser Beam"] = "rbxassetid://130791043",
+        Fatality = "rbxassetid://6607142036",
+        Bow = "rbxassetid://93158957747276",
+        koch = "rbxassetid://126832876895392",
+        golda = "rbxassetid://72129857868180",
+        agpa1 = "rbxassetid://136193374775854",
+        agpa2 = "rbxassetid://104673402060812",
+        ["135289543751528"] = "rbxassetid://135289543751528",
+        ["AR2 Head"] = "rbxassetid://2062016772",
+        ["AR2 Body"] = "rbxassetid://2062015952",
+        ["AR2 Limb"] = "rbxassetid://6659353525",
+        ["BB HitM"] = "rbxassetid://4645745735",
+        ["BB Kill"] = "rbxassetid://2636743632",
+        ["PD Head"] = "rbxassetid://4585351098",
+        ["PD Body"] = "rbxassetid://4585364605",
+        ["Baimware"] = "rbxassetid://3124331820",
+        ["Steve"] = "rbxassetid://4965083997",
+        ["Skeet"] = "rbxassetid://4753603610",
+        ["Body"] = "rbxassetid://3213738472",
+        ["Ding"] = "rbxassetid://7149516994",
+        ["Mario"] = "rbxassetid://2815207981",
+        ["Mario 2"] = "rbxassetid://5709456554",
+        ["Among Us"] = "rbxassetid://5700183626",
+        ["Button"] = "rbxassetid://12221967",
+        ["Oof"] = "rbxassetid://4792539171",
+        ["Osu"] = "rbxassetid://7149919358",
+        ["Osu Combobreak"] = "rbxassetid://3547118594",
+        ["Bambi"] = "rbxassetid://8437203821",
+        ["Click"] = "rbxassetid://8053704437",
+        ["Snow"] = "rbxassetid://6455527632",
+        ["Stone"] = "rbxassetid://3581383408",
+        ["Splat"] = "rbxassetid://12222152",
+        ["Bell"] = "rbxassetid://6534947240",
+        ["Slime"] = "rbxassetid://6916371803",
+        ["Saber"] = "rbxassetid://8415678813",
+        ["Bubble"] = "rbxassetid://6534947588",
+        ["Pick"] = "rbxassetid://1347140027",
+        ["Pop"] = "rbxassetid://198598793",
+        ["EmptyGun"] = "rbxassetid://203691822",
+        ["Bamboo"] = "rbxassetid://3769434519",
+        ["Stomp"] = "rbxassetid://200632875",
+        ["Bag"] = "rbxassetid://364942410",
+        ["HitMarker"] = "rbxassetid://8543972310",
+        ["LaserSlash"] = "rbxassetid://199145497",
+        ["RailGunF"] = "rbxassetid://199145534",
+        ["Bruh"] = "rbxassetid://4275842574",
+        ["Crit"] = "rbxassetid://296102734",
+        ["Clink"] = "rbxassetid://711751971",
+        ["CoD"] = "rbxassetid://160432334",
+        ["Windows XP Error"] = "rbxassetid://160715357",
+        ["Windows XP Ding"] = "rbxassetid://489390072",
+        ["HL Med Kit"] = "rbxassetid://4720445506",
+        ["HL Door"] = "rbxassetid://4996094887",
+        ["HL Crowbar"] = "rbxassetid://546410481",
+        ["HL Revolver"] = "rbxassetid://1678424590",
+        ["HL Elevator"] = "rbxassetid://237877850",
+        ["TF2 HitSound"] = "rbxassetid://3455144981",
+        ["TF2 Squasher"] = "rbxassetid://3466981613",
+        ["TF2 Retro"] = "rbxassetid://3466984142",
+        ["TF2 Space"] = "rbxassetid://3466982899",
+        ["TF2 Vortex"] = "rbxassetid://3466980212",
+        ["TF2 Beepo"] = "rbxassetid://3466987025",
+        ["TF2 Bat"] = "rbxassetid://3333907347",
+        ["TF2 Pow"] = "rbxassetid://679798995",
+        ["TF2 You Suck"] = "rbxassetid://1058417264",
+        ["Quake Hitsound"] = "rbxassetid://4868633804",
+        ["Fart"] = "rbxassetid://131314452",
+        ["Fart2"] = "rbxassetid://6367774932",
+        ["FortniteGuns"] = "rbxassetid://3008769599",
+        ["Crickets"] = "rbxassetid://2101148",
+        ["ScreamingKid"] = "rbxassetid://5980352978",
+        ["BitchBot"] = "rbxassetid://5709456554",
+        ["BitchBot Head"] = "rbxassetid://5043539486",
+        ["BitchBot Body"] = "rbxassetid://3744371342",
+        ["Minecraft Experience"] = "rbxassetid://1053296915",
+        ["BameWare"] = "rbxassetid://7898991882",
+        ["Fatality MKX"] = "rbxassetid://6721975770",
+        ["Fatality Original"] = "rbxassetid://158012252",
+        ["Doublekill 1"] = "rbxassetid://1950547222",
+        ["Doublekill 2"] = "rbxassetid://130819307",
+        ["Killing Spree 1"] = "rbxassetid://723054723",
+        ["Killing Spree 2"] = "rbxassetid://937898383",
+        ["Sit Dog"] = "rbxassetid://7349055654",
+        ["Csgo"] = "rbxassetid://7269900245",
+        ["Bop"] = "rbxassetid://8829676038",
+        ["Grenade Hit"] = "rbxassetid://5684745272",
+        ["KillTrocity"] = "rbxassetid://6818544945",
+        ["Double Kill"] = "rbxassetid://6818527307",
+        ["Triple kill"] = "rbxassetid://6818526855",
+        ["Over Kill"] = "rbxassetid://6818526995",
+        ["Kill Tacular"] = "rbxassetid://6818527070",
+        ["Kill Imanjaro"] = "rbxassetid://6818527258",
+        ["Kill Tastrophe"] = "rbxassetid://6818526916",
+        ["Kill Pocalypse"] = "rbxassetid://6818527144",
+        ["Kill Ionaire"] = "rbxassetid://6818527200",
+        ["Killing Spree"] = "rbxassetid://6822465178",
+        ["Killing Frenzy"] = "rbxassetid://6822465319",
+        ["Carrier Kill"] = "rbxassetid://7139067012",
+        ["Clutch Kill"] = "rbxassetid://7379106527",
+        ["Taco Bell"] = "rbxassetid://5689199277",
+        ["Kombat"] = "rbxassetid://8527433497",
+        ["Headshot"] = "rbxassetid://8418469749",
+        ["Elevator"] = "rbxassetid://8322227967",
+    }
+
+    local rageHitSoundFeatured = {
+        "Rust", "CODE200", "Minecraft", "Neverlose", "Gamesense",
+        "Bonk", "Bat", "Laser Beam", "Fatality", "Bow",
+    }
+
+    local rageHitSoundNames = (function()
+        local seen, names = {}, {}
+        for _, name in ipairs(rageHitSoundFeatured) do
+            if rageHitSounds[name] and not seen[name] then
+                seen[name] = true
+                names[#names + 1] = name
+            end
+        end
+        local rest = {}
+        for name in pairs(rageHitSounds) do
+            if not seen[name] then rest[#rest + 1] = name end
+        end
+        table.sort(rest)
+        for _, name in ipairs(rest) do names[#names + 1] = name end
+        return names
+    end)()
+
+    local function extractSoundId(assetUrl)
+        if not assetUrl then return "" end
+        return string.match(tostring(assetUrl), "(%d+)%s*$") or ""
+    end
+
+    local function applyHitPreset(dmgKey, flagName, presetName)
+        local url = rageHitSounds[presetName]
+        if not url then return end
+        local id = extractSoundId(url)
+        if id == "" then return end
+
+        Dmg[dmgKey] = id
+
+        local elem = Library and Library.Elements and Library.Elements[flagName]
+        if elem and type(elem.SetValue) == "function" then
+            pcall(elem.SetValue, elem, id)
+        end
+    end
+
+    -- ============================================
     -- 1. VISUAL GHOST
     -- ============================================
     local ghostMaterial = "SmoothPlastic"
@@ -277,7 +434,6 @@ return function(Library, VisualsTab)
         task.delay(10, function() if sound and sound.Parent then sound:Destroy() end end)
     end
 
-    -- === DAMAGE NUMBER: только 2 стиля ===
     local function showDamageNumber(player, damage)
         if not Dmg.damageEnabled then return end
         if not player or not player.Character then return end
@@ -286,7 +442,6 @@ return function(Library, VisualsTab)
 
         local style = Dmg.damageStyle or "Default"
 
-        -- ========== DEFAULT: плавно поднимается вверх и растворяется ==========
         if style == "Default" then
             local billboard = Instance.new("BillboardGui")
             billboard.Size = UDim2.new(0, 100, 0, 50)
@@ -312,8 +467,6 @@ return function(Library, VisualsTab)
             return
         end
 
-        -- ========== FLY AWAY: разлетаются в разные стороны вокруг головы ==========
-        -- Спавним на голове, летят по горизонтали в случайную сторону и растворяются
         local anchor = Instance.new("Part")
         anchor.Anchored = true
         anchor.CanCollide = false
@@ -341,21 +494,31 @@ return function(Library, VisualsTab)
         label.TextStrokeTransparency = 0.3
         label.Parent = billboard
 
-        -- Направление: случайное по горизонтали (XZ), с небольшим подъёмом вверх
-        local angle = math.random() * math.pi * 2
-        local horizSpeed = 12 + math.random() * 8
-        local upSpeed = 3 + math.random() * 3
+        local velocity, gravity
+        if style == "Ground" then
+            velocity = Vector3.new((math.random() * 2 - 1) * 4, 9 + math.random() * 3, (math.random() * 2 - 1) * 4)
+            gravity = Vector3.new(0, -45, 0)
+        else
+            local angle = math.random() * math.pi * 2
+            local speed = 6 + math.random() * 5
+            velocity = Vector3.new(math.cos(angle) * speed, 5 + math.random() * 5, math.sin(angle) * speed)
+            gravity = Vector3.new(0, -20, 0)
+        end
 
-        local velocity = Vector3.new(
-            math.cos(angle) * horizSpeed,
-            upSpeed,
-            math.sin(angle) * horizSpeed
-        )
-        local gravity = Vector3.new(0, -20, 0)
+        local startPos = anchor.Position
+        local floorY = startPos.Y - 8
+        if style == "Ground" then
+            local rayParams = RaycastParams.new()
+            rayParams.FilterType = Enum.RaycastFilterType.Exclude
+            rayParams.FilterDescendantsInstances = {player.Character, anchor}
+            local hit = Workspace:Raycast(startPos + Vector3.new(0, 1, 0), Vector3.new(0, -30, 0), rayParams)
+            if hit then floorY = hit.Position.Y + 1.2 end
+        end
 
         local elapsed = 0
-        local life = Dmg.damageLifetime
-        local fadeStart = life * 0.4
+        local landed = false
+        local life = Dmg.damageLifetime + (style == "Ground" and 0.5 or 0)
+        local fadeStart = math.max(life - 0.4, 0)
 
         local conn
         conn = RunService.Heartbeat:Connect(function(dt)
@@ -365,8 +528,16 @@ return function(Library, VisualsTab)
             end
             elapsed = elapsed + dt
 
-            velocity = velocity + gravity * dt
-            anchor.Position = anchor.Position + velocity * dt
+            if not landed then
+                velocity = velocity + gravity * dt
+                local newPos = anchor.Position + velocity * dt
+                if style == "Ground" and newPos.Y <= floorY then
+                    newPos = Vector3.new(newPos.X, floorY, newPos.Z)
+                    landed = true
+                    velocity = Vector3.zero
+                end
+                anchor.Position = newPos
+            end
 
             if elapsed >= fadeStart then
                 local t = math.clamp((elapsed - fadeStart) / math.max(life - fadeStart, 0.01), 0, 1)
@@ -1232,11 +1403,52 @@ return function(Library, VisualsTab)
     BTPanel:CreateSlider({ Text = "Lifetime", Min = 0.1, Max = 10, Default = BB.Life, Callback = function(v) BB.Life = v end })
     BTPanel:CreateSlider({ Text = "Transparency", Min = 0, Max = 1, Default = BB.Trans, Callback = function(v) BB.Trans = v end })
 
+    -- ============================================
+    -- HIT SOUNDS (с пресетами)
+    -- ============================================
     local HSPanel = VisualsTab:CreatePanel("Hit Sounds")
-    HSPanel:CreateToggle({ Text = "Hit Sounds", Default = false, Callback = function(s) Dmg.hitSoundsEnabled = s; updateMonitoringState() end })
-    HSPanel:CreateTextBox({ Text = "Hit Sound", Default = Dmg.hitSoundId, Callback = function(t) Dmg.hitSoundId = t end })
-    HSPanel:CreateTextBox({ Text = "Headshot Sound", Default = Dmg.headshotSoundId, Callback = function(t) Dmg.headshotSoundId = t end })
-    HSPanel:CreateTextBox({ Text = "Death Sound", Default = Dmg.deathSoundId, Callback = function(t) Dmg.deathSoundId = t end })
+
+    HSPanel:CreateToggle({
+        Text = "Hit Sounds",
+        Default = false,
+        Callback = function(s) Dmg.hitSoundsEnabled = s; updateMonitoringState() end
+    })
+
+    HSPanel:CreateTextBox({
+        Text = "Hit Sound",
+        Default = Dmg.hitSoundId,
+        Callback = function(t) Dmg.hitSoundId = t end
+    })
+    HSPanel:CreateDropdown({
+        Text = "Hit Sound Preset",
+        Options = rageHitSoundNames,
+        Default = "Rust",
+        Callback = function(v) applyHitPreset("hitSoundId", "HIT SOUND", v) end
+    })
+
+    HSPanel:CreateTextBox({
+        Text = "Headshot Sound",
+        Default = Dmg.headshotSoundId,
+        Callback = function(t) Dmg.headshotSoundId = t end
+    })
+    HSPanel:CreateDropdown({
+        Text = "Headshot Sound Preset",
+        Options = rageHitSoundNames,
+        Default = "Headshot",
+        Callback = function(v) applyHitPreset("headshotSoundId", "HEADSHOT SOUND", v) end
+    })
+
+    HSPanel:CreateTextBox({
+        Text = "Death Sound",
+        Default = Dmg.deathSoundId,
+        Callback = function(t) Dmg.deathSoundId = t end
+    })
+    HSPanel:CreateDropdown({
+        Text = "Death Sound Preset",
+        Options = rageHitSoundNames,
+        Default = "Oof",
+        Callback = function(v) applyHitPreset("deathSoundId", "DEATH SOUND", v) end
+    })
 
     -- ============================================
     -- WORLD PANEL
