@@ -914,10 +914,10 @@ return function(Library, VisualsTab)
         PendingApply = false,
     }
 
+    -- Контейнер теперь Workspace.Map.Parts (вместо .M_Pars)
     local function mapGetContainer()
         local map = Workspace:FindFirstChild("Map")
-        local parts = map and map:FindFirstChild("Parts")
-        return parts and parts:FindFirstChild("M_Pars")
+        return map and map:FindFirstChild("Parts")
     end
 
     local function mapAnyEnabled()
@@ -926,7 +926,7 @@ return function(Library, VisualsTab)
             or MapModifiers.TransparencyEnabled
     end
 
-    -- Сохраняем оригинальные свойства парта + все связанные с ним текстуры/декали
+    -- Сохраняем оригинальные свойства парта + все связанные текстуры/декали
     local function mapSavePart(part)
         if MapModifiers.Originals[part] then return end
         local data = {
@@ -939,14 +939,14 @@ return function(Library, VisualsTab)
             Decorations = {},
         }
 
-        -- SpecialMesh (обычно в Part-ах, у которых текстура рисуется через дочерний Mesh)
+        -- SpecialMesh (текстура через дочерний Mesh)
         local special = part:FindFirstChildOfClass("SpecialMesh")
         if special then
             data.SpecialMesh = special
             data.SpecialMeshTextureId = special.TextureId
         end
 
-        -- Decals / Textures — их нельзя удалить, только спрятать через Transparency = 1
+        -- Decals / Textures — прячем через Transparency = 1
         for _, child in ipairs(part:GetChildren()) do
             if child:IsA("Decal") or child:IsA("Texture") then
                 table.insert(data.Decorations, {
@@ -1478,7 +1478,7 @@ return function(Library, VisualsTab)
     })
 
     -- ============================================
-    -- MAP MODIFIERS (Loop Through Descendants)
+    -- MAP MODIFIERS
     -- ============================================
 
     WorldPanel:CreateToggle({
